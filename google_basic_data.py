@@ -9,14 +9,16 @@ import json
 import time
 import os
 
-
+#connect to hadoop file system
 def hdfs_connect():
     hadoop_classpath = os.popen("hadoop classpath --glob").read().strip()
     os.environ['CLASSPATH'] = hadoop_classpath
+    #set host and port to default from the hadoop config file
     hdfs = fs.HadoopFileSystem(host='default', port=0)
 
     return hdfs
 
+#divide shapefile to a grid and return the points
 def create_grid(shapefile):
     # Get the bounding box of the shapefile
     minx, miny, maxx, maxy = shapefile.total_bounds
@@ -28,9 +30,11 @@ def create_grid(shapefile):
 
     return points
 
+#get the coordinates for which the places API needs to be called
 def get_bcn_coordinates():
     # get shapefile of barcelona
     barcelona = gpd.read_file(r"Shapefiles_Bcn/shapefiles_barcelona_distrito.shp")
+    #get grid points
     points = create_grid(barcelona)
 
     # create subareas with radius 0.007
@@ -42,16 +46,17 @@ def get_bcn_coordinates():
 
     merged_sub_surfaces = gpd.GeoDataFrame(pd.concat(sub_surfaces, ignore_index=True), crs=barcelona.crs)
 
-    # check if data intersects
+    # check if the created subareas intersect with barcelona area
     intersect = []
     for sub_surface in merged_sub_surfaces.iterrows():
         inter = barcelona.intersects(sub_surface[1].geometry).any()
         intersect.append(inter)
 
     merged_sub_surfaces['intersect'] = intersect
-    # keep only those that intersect
+    # remove the subareas that are outside of barcelona
     new_surface = merged_sub_surfaces[(merged_sub_surfaces.intersect == True)]
 
+    #get the centroids of the subareas
     coordinates = []
     for surface in new_surface.iterrows():
         coordinate = str(surface[1].geometry.centroid.y) + ',' + str(surface[1].geometry.centroid.x)
@@ -59,6 +64,7 @@ def get_bcn_coordinates():
 
     return coordinates
 
+#transform json file to parquet and save to hadoop
 def save_to_hadoop_as_parquet(hdfs,df_save,filepath):
     pa_table = pa.Table.from_pandas(df_save)
     hdfs_file = hdfs.open_output_stream(filepath)
@@ -70,6 +76,7 @@ def save_to_hadoop_as_parquet(hdfs,df_save,filepath):
 def main():
     #connect to hadoop
     hdfs = hdfs_connect()
+    #get coordinates for the api call
     coordinates = get_bcn_coordinates()
 
 
@@ -79,37 +86,39 @@ def main():
     file_count = 1
 
     for coordinate in coordinates:
+        # in case we need more than just restaurants in the future
         for keyword in keywords:
+            #url for the API call
             url = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=' + coordinate + '&radius=' + str(
                 radius) + '&keyword=' + str(keyword) + '&key=' + api_key
             count = 0
             while True:
+                #call the api
                 respon = requests.get(url)
                 jj = json.loads(respon.text)
 
-                # json to dataframe
+                # json response to pandas dataframe
                 df_response = pd.json_normalize(jj['results'])
 
                 # check if the response contains results
                 if not df_response.empty:
-
                     # put file to hadoop
                     hdfs_file_path = '/user/hadoop/google_rest/google' + str(file_count) + '.parquet'
                     save_to_hadoop_as_parquet(hdfs, df_response, hdfs_file_path)
                     file_count = file_count + 1
 
                 time.sleep(3)
-
+                #check if there is a next page in the response
                 if 'next_page_token' not in jj:
+                    #proceed to next call/iteration
                     break
                 else:
+                    #get the next page
                     next_page_token = jj['next_page_token']
                     url = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json?key=' + str(
                         api_key) + '&pagetoken=' + str(next_page_token)
 
 
 
-
-# Call main function
 if __name__ == '__main__':
     main()
