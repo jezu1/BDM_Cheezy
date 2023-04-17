@@ -11,7 +11,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from urllib.request import urlopen
 
 def scrape_tripadvisor(
-    savepath="tripadvisor.csv",
+    savepath="dump/tripadvisor/tripadvisor.csv",
     pages_to_scrape=10,
     images_per_resto=5 , # number of times to click next image
     next_max_tries=10,  # mac number of tries to click the next button
@@ -112,7 +112,7 @@ def scrape_tripadvisor(
     
     # Concatenate and save all restaurant data scraped    
     restos=pd.concat(restos, ignore_index=True)
-    restos.to_csv(savepath)
+    restos.to_csv(savepath, index=False)
     
     # When all pages have been processed, quit the driver
     driver.quit()
