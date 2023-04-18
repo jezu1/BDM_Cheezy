@@ -60,6 +60,7 @@ def save_to_delta(df, savepath):
     Create delta tables from pandas tables and save into hdfs
     """
     # schema=get_spark_schema(df))\ 
+    df.columns=[i.replace(' ','_') for i in df.columns]
     spark.createDataFrame(df)\
                         .write.format("delta")\
                         .mode("overwrite")\
