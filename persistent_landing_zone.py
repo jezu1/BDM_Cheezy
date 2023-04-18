@@ -59,14 +59,29 @@ def save_to_delta(df, savepath):
     """
     Create delta tables from pandas tables and save into hdfs
     """
-    # schema=get_spark_schema(df))\ 
+    # Clean up column names
     df.columns=[i.replace(' ','_') for i in df.columns]
-    spark.createDataFrame(df)\
-                        .write.format("delta")\
-                        .mode("overwrite")\
-                        .save(savepath)
-    print('Saved file in hadoop: '+savepath)
-                        
+    
+    # Save as delta table
+    try:
+        spark.createDataFrame(df)\
+                            .write.format("delta")\
+                            .mode("overwrite")\
+                            .save(savepath)
+    except: 
+        # convert numpy array types to string 
+        list_cols=df.applymap(type)\
+            .astype(str).isin(["<class 'numpy.ndarray'>", "<class 'list'>"])\
+            .any(0).to_frame().rename(columns={0:'b'}).query('b').index
+        for col in list_cols:
+            df[col]=df[col].astype(str)
+        spark.createDataFrame(df)\
+                            .write.format("delta")\
+                            .mode("overwrite")\
+                            .save(savepath)
+            
+    print('Saved file in delta lake: '+savepath)
+        
 def read_save_to_delta(file):
     """
     Read files and save as delta table
