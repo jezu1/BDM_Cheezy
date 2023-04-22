@@ -4,7 +4,7 @@
 1. [General Info](#general-info)
 2. [Set up and requirements](#technologies)
 3. [Python scripts](#installation)
-4. 
+
 ### General Info
 ***
 This git repository is part of the university project P1 Landing Zone implemented in the course of Big Data Management at UPC barcelona. The python scripts move data needed for our own startup idea Cheezy to a temporal and persistent landing zone.
