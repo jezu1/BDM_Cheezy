@@ -1,4 +1,4 @@
-# DBM_Cheesy
+# DBM_Cheezy
 
 ## Table of Contents
 1. [General Info](#general-info)
